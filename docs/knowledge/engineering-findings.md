@@ -4,7 +4,7 @@ This file demonstrates the repository learning requirement: retain compact evide
 
 ## Detached receipts on Windows
 
-The initial scheduler extension CI on revision e645e23 exposed a transient PermissionError reading receipt.json while another process replaced it on Windows Python 3.10; cleanup also encountered an open supervisor log. Evidence: [failing run](https://github.com/bjoernellens1/agent-rules/actions/runs/45470134680), Windows/Python 3.10 job. This was not a failed GPU job or model result. Treat file-sharing races as a portability concern. The subsequent implementation adds bounded retry for Windows atomic replacement/read and regression polling; the current CI must verify the fix before claiming portability.
+The initial scheduler extension CI on revision e645e23 exposed a transient PermissionError reading receipt.json while another process replaced it on Windows Python 3.10; cleanup also encountered an open supervisor log. Evidence: [failing run](https://github.com/bjoernellens1/agent-rules/actions/runs/45470134680), Windows/Python 3.10 job. This was not a failed GPU job or model result. Treat file-sharing races as a portability concern. The subsequent implementation adds bounded retry for Windows atomic replacement/read and regression polling; the expanded 24-test CI at 5bfe088 passed all six OS/Python combinations ([run](https://github.com/bjoernellens1/agent-rules/actions/runs/45470537275)). This verifies the exercised race/cancellation paths, not arbitrary process supervision.
 
 ## Installation and initial runner
 

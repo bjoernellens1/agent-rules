@@ -26,6 +26,7 @@ Examples assume an actual verified finding and real source references, not place
     python .agent-rules/agent.py knowledge packet --project sceneweave --limit 20
     python .agent-rules/agent.py knowledge propose --project sceneweave --topic optimizer/active-set --body "DISTILLED CLAIM" --observations 1 2
     python .agent-rules/agent.py knowledge proposals --project sceneweave
+    python .agent-rules/agent.py knowledge inspect-proposal 1
     python .agent-rules/agent.py knowledge decide 1 approve --reviewer designated-reviewer --reason "Verified against cited sources"
     python .agent-rules/agent.py knowledge search --project sceneweave --include-global --query "active set" --budget 6000
     python .agent-rules/agent.py knowledge history --project sceneweave --topic optimizer/active-set
@@ -34,13 +35,19 @@ Examples assume an actual verified finding and real source references, not place
 
 Use actual IDs returned by your store. Kind is fact, decision, lesson, procedure or negative-result. Each project/topic/kind is a stable identity for one proposition; split distinct propositions into different topics. Observation text is normalized for exact deduplication, keeping independent evidence. Similarity is advisory (bounded recent observations); avoid merging negations, different numerical conditions or independent claims. Curate conflict groups into a short accurate synthesis. Superseded and retired facts are kept with their source/proposal history, not erased. Stale facts are excluded from normal recall; use --include-stale only when reviewing them. Approve a new version after revalidation or explicitly retire it. Proposal approval is a recorded decision, not authentication; enforce reviewer roles outside the CLI.
 
-Promote a lesson across repositories only if scope justifies it: propose with --project global --cross-project and source observation IDs. It must still be reviewed and does not consume the original project's pending observation. New evidence must preserve important conflicting evidence; don't compress away conditions, failures or uncertainty.
+Promote a lesson across repositories only if scope justifies it: propose with --project global --cross-project and source observation IDs. It must still be reviewed and does not consume the original project's pending observation. New evidence invalidates a pending proposal snapshot and reopens a covered observation. Reviewed facts retain the exact approval-time evidence snapshot; use inspect-proposal to review paginated sources before approval. For migrated v1 databases, historical source sets cannot be reconstructed, so snapshots reflect available sources at migration time (recorded in the event log). New evidence must preserve important conflicting evidence; don't compress away conditions, failures or uncertainty.
 
 ## Optional scheduled curation ("dreaming")
 
 Run maintain periodically via your existing scheduler to propose isolated observations and flag conflicts/stale facts. A curator can read packet output, distill candidate claims and use propose. For automated model calls:
 
     python .agent-rules/agent.py knowledge curate --project sceneweave --limit 20 --timeout 120 -- /path/to/approved-curator-adapter
+
+For an approved local OpenAI-compatible chat endpoint, an optional standard-library adapter is included:
+
+    python .agent-rules/agent.py knowledge curate --project sceneweave --limit 20 --timeout 120 -- python .agent-rules/agent_curator.py --endpoint http://127.0.0.1:1234/v1/chat/completions --model YOUR_LOADED_MODEL
+
+Use the actual local model and port. The adapter rejects redirects and non-loopback HTTP; remote HTTPS requires --allow-remote and separate authorization to transmit the packet. If required, pass --api-key-env NAME (credential value read from environment, never printed). Optional --json-mode asks compatible servers for structured JSON; otherwise strict output is still required. No real endpoint is contacted during installation.
 
 The adapter reads one JSON packet from stdin and writes only {"proposals":[{"topic":"stable-key","kind":"lesson","body":"distilled claim","observations":[1,2],"review_days":90}]} to stdout. It receives bounded observations and current/rejected claim context. No model, credentials or automatic cloud transmission are installed. The chosen command is trusted local code; authorize its data access, network and spend separately. The CLI validates output shape, observation IDs and stale target versions; it does not verify the truth of an LLM summary. All proposals need designated review; never auto-approve policy, permission or gate changes.
 

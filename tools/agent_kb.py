@@ -35,6 +35,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_active ON facts(project,topic,kind) WHERE 
 CREATE TABLE IF NOT EXISTS fact_sources(
  fact INTEGER NOT NULL REFERENCES facts(id), observation INTEGER NOT NULL REFERENCES observations(id),
  PRIMARY KEY(fact,observation));
+CREATE TABLE IF NOT EXISTS proposal_evidence(
+ proposal INTEGER NOT NULL REFERENCES proposals(id), observation INTEGER NOT NULL REFERENCES observations(id),
+ source TEXT NOT NULL, recorded TEXT NOT NULL, PRIMARY KEY(proposal,observation,source));
+CREATE TABLE IF NOT EXISTS fact_evidence(
+ fact INTEGER NOT NULL REFERENCES facts(id), observation INTEGER NOT NULL REFERENCES observations(id),
+ source TEXT NOT NULL, recorded TEXT NOT NULL, PRIMARY KEY(fact,observation,source));
 CREATE TABLE IF NOT EXISTS covered(
  observation INTEGER PRIMARY KEY REFERENCES observations(id),
  proposal INTEGER NOT NULL REFERENCES proposals(id));
@@ -87,12 +93,27 @@ def connect(args):
     c.execute("PRAGMA foreign_keys=ON")
     c.execute("PRAGMA busy_timeout=20000")
     version=c.execute("PRAGMA user_version").fetchone()[0]
-    if version not in (0,1):
+    if version not in (0,1,2):
         c.close()
         raise ValueError("Unsupported knowledge schema")
     # Rollback journal: single local filesystem, short write transactions.
     c.executescript(SCHEMA)
-    c.execute("PRAGMA user_version=1")
+    c.execute("BEGIN IMMEDIATE")
+    migration_version=c.execute("PRAGMA user_version").fetchone()[0]
+    if migration_version==1:
+        # Legacy source lists were mutable. Preserve what is available at migration;
+        # exact historical approval-time evidence cannot be reconstructed.
+        c.execute("""INSERT OR IGNORE INTO fact_evidence
+          SELECT f.fact,f.observation,e.source,e.recorded FROM fact_sources f
+          JOIN evidence e ON f.observation=e.observation""")
+        for p in c.execute("SELECT id,source_ids FROM proposals").fetchall():
+            for oid in json.loads(p["source_ids"]):
+                c.execute("""INSERT OR IGNORE INTO proposal_evidence
+                  SELECT ?,observation,source,recorded FROM evidence WHERE observation=?""",(p["id"],oid))
+        c.execute("INSERT INTO events(at,action,detail) VALUES(?,?,?)",
+                  (now(),"schema-migration","Legacy evidence snapshot is from migration time, not original approval."))
+    c.execute("PRAGMA user_version=2")
+    c.commit()
     try:
         c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5(project,topic,kind,body,content='facts',content_rowid='id')")
         c.executescript("""
@@ -131,12 +152,24 @@ def observe(c,project,topic,kind,body,source):
     oid=c.execute("SELECT id FROM observations WHERE project=? AND topic=? AND kind=? AND fingerprint=?",
                   (project,topic,kind,fingerprint)).fetchone()[0]
     added=c.execute("INSERT OR IGNORE INTO evidence VALUES(?,?,?)",(oid,source,now())).rowcount
-    if added: event(c,"observe",{"id":oid})
+    if added:
+        # New independent evidence requires review, even for an identical observation.
+        c.execute("DELETE FROM covered WHERE observation=?",(oid,))
+        event(c,"observe",{"id":oid})
     return oid, bool(added)
 
 def active(c,project,topic,kind):
     r=c.execute("SELECT id FROM facts WHERE project=? AND topic=? AND kind=? AND status='active'",(project,topic,kind)).fetchone()
     return r[0] if r else None
+
+def source_snapshot(c,ids):
+    result=[]
+    for oid in sorted(set(ids)):
+        result.extend(rows(c,"SELECT observation,source,recorded FROM evidence WHERE observation=? ORDER BY source",(oid,)))
+    return result
+
+def frozen_sources(c,pid):
+    return rows(c,"SELECT observation,source,recorded FROM proposal_evidence WHERE proposal=? ORDER BY observation,source",(pid,))
 
 def proposal(c,project,topic,kind,body,ids,days=90,action="upsert",cross=False):
     validate_key(project);validate_key(topic)
@@ -153,10 +186,13 @@ def proposal(c,project,topic,kind,body,ids,days=90,action="upsert",cross=False):
             raise ValueError("Cross-project promotion requires explicit global promotion")
     base=active(c,project,topic,kind)
     if action=="retire" and base is None: raise ValueError("No active fact to retire")
-    fingerprint=sha([project,topic,kind,norm(body),ids,days,action,base])
+    snapshot=source_snapshot(c,ids)
+    fingerprint=sha([project,topic,kind,norm(body),ids,days,action,base,snapshot])
     c.execute("""INSERT OR IGNORE INTO proposals(project,topic,kind,body,action,base,source_ids,fingerprint,created,review_days)
               VALUES(?,?,?,?,?,?,?,?,?,?)""",(project,topic,kind,body,action,base,json.dumps(ids),fingerprint,now(),days))
     pid=c.execute("SELECT id FROM proposals WHERE fingerprint=?",(fingerprint,)).fetchone()[0]
+    for e in snapshot:
+        c.execute("INSERT OR IGNORE INTO proposal_evidence VALUES(?,?,?,?)",(pid,e["observation"],e["source"],e["recorded"]))
     return pid
 
 def handle_add(c,a):
@@ -178,6 +214,9 @@ def handle_decide(c,a):
     if a.decision=="approve":
         old=active(c,p["project"],p["topic"],p["kind"])
         if old!=p["base"]: raise ValueError("Stale proposal: active fact changed; create a new proposal")
+        snapshot=frozen_sources(c,p["id"])
+        if snapshot!=source_snapshot(c,json.loads(p["source_ids"])):
+            raise ValueError("Evidence changed after proposal; create a fresh proposal")
         stamp=now()
         if old is not None:
             c.execute("UPDATE facts SET status=?,superseded=? WHERE id=?",
@@ -188,6 +227,8 @@ def handle_decide(c,a):
                          (p["project"],p["topic"],p["kind"],p["body"],"active",stamp,due,p["id"])).lastrowid
             for oid in json.loads(p["source_ids"]):
                 c.execute("INSERT INTO fact_sources VALUES(?,?)",(fid,oid))
+            for e in snapshot:
+                c.execute("INSERT INTO fact_evidence VALUES(?,?,?,?)",(fid,e["observation"],e["source"],e["recorded"]))
         for oid in json.loads(p["source_ids"]):
             # Global promotion must not consume a project's own pending knowledge.
             own=c.execute("SELECT project FROM observations WHERE id=?",(oid,)).fetchone()[0]
@@ -199,9 +240,8 @@ def handle_decide(c,a):
     c.commit();emit({"proposal":a.id,"decision":a.decision,"fact":fid})
 
 def evidence(c,fid):
-    return rows(c,"""SELECT o.id AS observation,o.project,e.source,e.recorded FROM fact_sources s
-       JOIN observations o ON o.id=s.observation JOIN evidence e ON e.observation=o.id
-       WHERE s.fact=? ORDER BY o.id,e.source LIMIT 12""",(fid,))
+    return rows(c,"""SELECT o.id AS observation,o.project,e.source,e.recorded FROM fact_evidence e
+       JOIN observations o ON o.id=e.observation WHERE e.fact=? ORDER BY o.id,e.source LIMIT 12""",(fid,))
 
 def pending(c,project,limit):
     return rows(c,"""SELECT o.* FROM observations o LEFT JOIN covered co ON o.id=co.observation
@@ -239,6 +279,7 @@ def packet(c,a):
     obs=pending(c,a.project,a.limit)
     for o in obs:
         o["evidence"]=rows(c,"SELECT source,recorded FROM evidence WHERE observation=? ORDER BY recorded LIMIT 12",(o["id"],))
+        o["evidence_fingerprint"]=sha(source_snapshot(c,[o["id"]]))
         o.pop("fingerprint",None)
         current=active(c,a.project,o["topic"],o["kind"])
         o["current_fact"]=dict(c.execute("SELECT * FROM facts WHERE id=?",(current,)).fetchone()) if current else None
@@ -280,6 +321,8 @@ def handle_curate(c,a):
         ids=p["observations"]
         if not isinstance(ids,list) or not ids or any(type(i)!=int or i not in allowed for i in ids):
             raise ValueError("Curator cited evidence outside packet")
+        if any(sha(source_snapshot(c,[i]))!=allowed[i]["evidence_fingerprint"] for i in ids):
+            raise ValueError("Evidence changed during curation; retry with fresh packet")
         topic=p["topic"];kind=p["kind"]
         matching=[o for o in allowed.values() if o["topic"]==topic and o["kind"]==kind]
         expected=matching[0]["current_fact"]["id"] if matching and matching[0]["current_fact"] else None
@@ -359,6 +402,16 @@ def handle_history(c,a):
     result=rows(c,"SELECT * FROM facts WHERE project=? AND topic=? ORDER BY id DESC LIMIT 100",(a.project,a.topic))
     for f in result: f["evidence"]=evidence(c,f["id"])
     emit({"facts":result,"proposals":rows(c,"SELECT * FROM proposals WHERE project=? AND topic=? ORDER BY id DESC LIMIT 100",(a.project,a.topic))})
+
+def handle_inspect_proposal(c,a):
+    if a.offset<0 or not 1<=a.limit<=100:raise ValueError("Invalid evidence page")
+    p=c.execute("SELECT * FROM proposals WHERE id=?",(a.id,)).fetchone()
+    if not p:raise ValueError("Unknown proposal")
+    page=rows(c,"""SELECT pe.observation,o.project,o.topic,o.kind,o.body,pe.source,pe.recorded
+       FROM proposal_evidence pe JOIN observations o ON o.id=pe.observation
+       WHERE pe.proposal=? ORDER BY pe.observation,pe.source LIMIT ? OFFSET ?""",(a.id,a.limit,a.offset))
+    count=c.execute("SELECT count(*) FROM proposal_evidence WHERE proposal=?",(a.id,)).fetchone()[0]
+    emit({"proposal":dict(p),"evidence":page,"evidence_count":count,"offset":a.offset})
 
 def handle_proposals(c,a):
     validate_key(a.project)
@@ -488,6 +541,7 @@ def register(subs):
     p=cmd("search",handle_search,True);p.add_argument("--query",default="");p.add_argument("--include-global",action="store_true")
     p.add_argument("--include-stale",action="store_true");p.add_argument("--limit",type=int,default=20);p.add_argument("--budget",type=int,default=6000)
     p=cmd("history",handle_history,True);p.add_argument("--topic",required=True)
+    p=cmd("inspect-proposal",handle_inspect_proposal);p.add_argument("id",type=int);p.add_argument("--offset",type=int,default=0);p.add_argument("--limit",type=int,default=20)
     p=cmd("proposals",handle_proposals,True);p.add_argument("--status",choices=["pending","approved","rejected"],default="pending");p.add_argument("--limit",type=int,default=100)
     p=cmd("export",handle_export,True);p.add_argument("--limit",type=int,default=1000)
     p=cmd("writeback",handle_writeback);p.add_argument("id",type=int);p.add_argument("--target",required=True);p.add_argument("--public-evidence",required=True);p.add_argument("--apply",action="store_true");p.add_argument("--confirm-repo-safe",action="store_true");p.add_argument("--expected-sha")

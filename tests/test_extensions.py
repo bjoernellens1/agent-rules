@@ -52,6 +52,49 @@ class ExtensionsTests(unittest.TestCase):
         self.assertEqual({h["status"] for h in history},{"active","superseded"})
         self.assertEqual(history[0]["id"],second)
         self.assertEqual(self.kb("audit")["integrity"],["ok"])
+    def test_frozen_evidence_and_reproposal(self):
+        oid=self.add(source="run:first")
+        p=self.propose(oid)
+        self.add(source="run:second")
+        self.kb("decide",p,"approve","--reviewer","reviewer","--reason","stale",ok=2)
+        fresh=self.propose(oid)
+        self.assertNotEqual(p,fresh)
+        self.assertEqual(self.kb("inspect-proposal",fresh)["evidence_count"],2)
+        fid=self.approve(fresh)
+        self.add(source="run:third")
+        result=self.kb("search","--project","alpha","--query","scale")["records"][0]
+        self.assertEqual(result["id"],fid);self.assertEqual(len(result["evidence"]),2)
+        self.assertEqual(len(self.kb("packet","--project","alpha")["observations"]),1)
+        new=self.approve(self.propose(oid))
+        facts=self.kb("history","--project","alpha","--topic","gpu/scale")["facts"]
+        self.assertEqual({x["id"]:len(x["evidence"]) for x in facts},{fid:2,new:3})
+
+    def test_curator_adapter_local_mock(self):
+        import http.server
+        import threading
+        messages=[]
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                request=json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                messages.append(request)
+                response=json.dumps({"choices":[{"message":{"content":json.dumps({"proposals":[]})}}]}).encode()
+                self.send_response(200);self.send_header("Content-Length",str(len(response)));self.end_headers()
+                self.wfile.write(response)
+            def log_message(self,*args):pass
+        server=http.server.HTTPServer(("127.0.0.1",0),Handler)
+        worker=threading.Thread(target=server.serve_forever,daemon=True);worker.start()
+        adapter=CLI.with_name("agent_curator.py")
+        try:
+            argv=[sys.executable,str(adapter),"--endpoint","http://127.0.0.1:"+str(server.server_port)+"/v1/chat/completions","--model","mock"]
+            p=subprocess.run(argv,input='{"observations":[]}',capture_output=True,text=True,timeout=10)
+            self.assertEqual(p.returncode,0,p.stderr)
+            self.assertEqual(json.loads(p.stdout),{"proposals":[]})
+            self.assertEqual(messages[0]["model"],"mock")
+            p=subprocess.run([sys.executable,str(adapter),"--endpoint","http://example.invalid/v1/chat/completions","--model","mock"],input='{"observations":[]}',capture_output=True,text=True,timeout=5)
+            self.assertEqual(p.returncode,2)
+        finally:
+            server.shutdown();server.server_close();worker.join(timeout=5)
+
     def test_scope_and_global_promotion(self):
         oid=self.add()
         self.kb("propose","--project","beta","--topic","gpu/scale","--body","Wrong scope","--observations",oid,ok=2)
