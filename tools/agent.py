@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Portable agent workflow CLI. Python 3.10+, standard library and Git."""
 import argparse
-from collections import deque
 from datetime import datetime, timezone
 import hashlib
 import json
