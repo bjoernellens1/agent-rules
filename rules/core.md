@@ -15,4 +15,4 @@ Optimize time to validated results, correctness, maintainability and resource ef
 11. Turn recurrent mistakes into deterministic checks, small scoped rules or skills. Append durable findings with evidence; do not autonomously rewrite policy.
 12. Use focused commits and independent review for consequential changes. Do not self-approve protected changes or publish unrelated work.
 
-Load relevant on-demand procedures in .agents/skills/ (research, plan, implement, experiment, review, visual-qa, handoff, learn). For tasks involving significant GPU or scientific work, also read the research profile when installed.
+Load relevant on-demand procedures in .agents/skills/ (research, plan, implement, experiment, review, visual-qa, handoff, learn). For tasks involving significant GPU or scientific work, also read the research profile when that profile is active.
