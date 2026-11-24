@@ -1,0 +1,18 @@
+{
+  "engine": "docker",
+  "stage": "evaluator",
+  "image": "registry.example/evaluator@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "mounts": {
+    "evaluator": "/absolute/immutable-evaluator",
+    "data": "/absolute/sealed-data",
+    "predictions": "/absolute/immutable-predictions",
+    "output": "/absolute/fresh-output"
+  },
+  "cpu": 2,
+  "memory_mib": 4096,
+  "timeout_s": 600,
+  "command": [
+    "python",
+    "evaluate.py"
+  ]
+}

@@ -3,7 +3,7 @@
 Optimize time to validated results, correctness, maintainability and resource efficiency.
 
 1. Establish the actual repository, intended revision, dirty state, environment and running build. Preserve concurrent and unrelated work.
-2. Read the smallest relevant context: local rules, authoritative source, contracts and measured evidence. Reuse existing code, tools and findings.
+2. Read the smallest relevant context: local rules, authoritative source, contracts and measured evidence. Reuse existing code, tools and findings. Before substantial work, query relevant reviewed project/global knowledge using the stable project key; do not load the whole knowledge base.
 3. Implement small reversible changes directly; for substantial work define objective, scope, baseline, budget, acceptance and stop conditions before editing.
 4. Assign one owner per writable component. Isolate concurrent writes in worktrees. Coordinate shared interfaces and integration; do not stage another worker's changes.
 5. Build a minimal working vertical slice. Prefer simple existing mechanisms; avoid speculative abstractions, duplicate logic, dependencies, flags and unrelated refactors.

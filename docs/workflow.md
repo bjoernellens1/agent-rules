@@ -26,3 +26,7 @@ A Markdown rule is guidance, not access control. For consequential runs use dist
 ## Executable ownership checks
 
 Use task worktree with an explicit base and fresh path outside the current checkout. Use the scope command with a reviewer-controlled copy of templates/scope.json, replacing the base with an immutable commit SHA and allowed/protected paths with actual repository-relative prefixes. The scope tool inspects committed, staged, unstaged and nonignored untracked paths, including both sides of renames. Protected paths override allowed paths. This detects out-of-scope changes at review time, not transient writes or ignored files; enforce real evaluator isolation separately.
+
+## Completion includes repository learning
+
+Before final handoff, run the learn skill: recall relevant prior knowledge, record any durable verified finding in the target repository's authoritative file and the shared knowledge store, and prepare an evidence-backed upstream improvement for general rules, skills, checks or tools. Mark no durable finding or a precise blocker explicitly. A local chat summary alone is not completion. Do not expose private data or weaken protected policies. Prefer a test/tool improvement to repeatedly adding prose.

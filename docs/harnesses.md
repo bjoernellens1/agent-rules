@@ -9,3 +9,5 @@ The source of truth is rules/core.md plus an optional profile. Installation embe
 This toolkit does not install harness plugins or change global settings. Verify actual context loading and permissions with a harmless task. Configure review workers read-only, and assign experiment workers narrowly scoped execution permissions. Never assume a prompt creates a sandbox.
 
 For cross-project configuration, maintain a versioned private config without credentials, pin toolkit revisions, and keep site-specific hardware and scheduler settings outside the public repository. Review updates before installing. Do not automatically enable network/SSH, cloud billing, or privilege escalation.
+
+Installation: read INSTALL.md and AGENT_INSTALL.md. Set a stable project key and common private AGENT_RULES_KB for every local harness/worktree. Use the same CLI for knowledge recall and writeback. Harness-specific telemetry imports and model-driven curation are opt-in; no hidden session capture is configured. Run the learn skill before task completion.

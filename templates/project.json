@@ -1,0 +1,21 @@
+{
+  "commands": {
+    "test": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-v"
+    ],
+    "gpu-probe": [
+      "python",
+      "REPLACE_GPU_PROBE.py"
+    ],
+    "visual-qa": [
+      "python",
+      "REPLACE_VISUAL_QA.py"
+    ]
+  }
+}

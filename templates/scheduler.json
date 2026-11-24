@@ -1,0 +1,25 @@
+{
+  "context": "REPLACE_CONTEXT",
+  "namespace": "research",
+  "name": "unique-probe-001",
+  "backend": "job",
+  "image": "registry.example/research@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "scheduler_name": "REPLACE_ACTUAL_SCHEDULER",
+  "resources": {
+    "cpu": 2,
+    "memory_mib": 4096,
+    "gpu": 1,
+    "gpu_resource": "REPLACE/gpu"
+  },
+  "timeout_s": 600,
+  "stage": "candidate",
+  "command": [
+    "python",
+    "/source/benchmark.py"
+  ],
+  "volumes": {
+    "source": "source-snapshot",
+    "data": "permitted-development-data",
+    "output": "unique-output"
+  }
+}

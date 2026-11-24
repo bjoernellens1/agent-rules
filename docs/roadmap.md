@@ -1,14 +1,21 @@
-# Roadmap
+# Roadmap and validation boundaries
 
-Implemented in the initial version: distributable core/research policies, on-demand skills, templates, non-destructive installer, local doctor/task creation and isolated worktrees, scope checks, bounded synchronous/detached local command execution, receipt verification, matched metrics comparison/gates and time-to-quality threshold comparisons, and append-only findings.
+## Implemented V2
 
-Next, after real use on a small project:
+- Core/research rules, eight reusable skills, task/report/handoff/scope templates, non-destructive installer and explicit human/agent installation contracts.
+- Local run receipts, isolated worktrees, scope checks, numerical gates and time-to-quality curves.
+- Cooperative local device leases/cancellation; Kubernetes Job and Argo Workflow manifest/submit/status/log/usage/cancel adapters, mounted artifact fetch, canonical project argv.
+- Candidate/evaluator container planning/execution with disjoint read-only inputs and separate output.
+- Private explicit task telemetry and matched agent benchmark comparisons.
+- Shared SQLite knowledge: observation deduplication, evidence, active temporal facts, approval/rejection, stale review, lexical search and duplicate candidates, optional curator command, Markdown export, backup, cross-host observation exchange and reviewed Git writeback.
+- Mandatory learning writeback: target repo canonical source + private KB + evidence-backed upstream improvement where generalizable.
 
-- Add a scheduler adapter for existing K3s/Kai/Hera infrastructure and site-specific local GPU runners; include leases, cancellation, artifact sync and actual resource accounting.
-- Integrate immutable evaluator and data artifacts with independent write permissions; enforce gates in CI or a trusted evaluator.
-- Add task-level telemetry (model/harness/version, token counts, costs, wall clock) and matched agent benchmarks; do not hardcode model rankings.
-- Implement optional memory curation with explicit user approval, source citations, locking and reversible changes.
-- Add repository-specific adapter manifests for commands, GPU probes and visual QA; avoid embedding project-specific logic in the universal toolkit.
-- Trial on one research repo, evaluate time-to-validated-result and context cost, then expand. Use the smallest justified set of new features.
+## Site integration and evidence still needed
 
-No estimate of productivity uplift is treated as measured until a controlled trial has run.
+- Pilot one actual research repo and run real matched GPU jobs on approved Strix Halo, Apple or cluster devices; validate device allocation, results and artifact transfer. Kai/Hera/Argo installation, exact queue/resource policies and live credentials are site-specific, not bundled.
+- Validate container evaluator on target engine with trusted immutable inputs and actual OS/cluster permissions; enforce evaluator policy in the site's CI.
+- Collect real provider usage exports and run a preregistered paired agent benchmark campaign.
+- Configure an opt-in scheduled curator with an approved model/adapter and data-sharing boundary. Check recall relevance, review burden, compaction and recurring errors.
+- Consider semantic embeddings or an authenticated knowledge service only if measured recall or multi-host authorization needs justify it. Current store is local-first with scoped exchange, not a multi-user distributed service.
+
+No productivity multiplier, GPU deployment, real model curation or scientific improvement is claimed without measurements.

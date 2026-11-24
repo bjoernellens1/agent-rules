@@ -4,6 +4,14 @@ Reusable, evidence-driven engineering for coding agents and scientific software.
 
 Use with any harness that can read Markdown and run Python: OpenCode, Codex, Claude Code, Antigravity or a future agent. No provider credentials, LLM dependency, paid service or mandatory multi-agent framework.
 
+## Install
+
+**[Human installation guide](INSTALL.md) · [Coding-agent installation contract](AGENT_INSTALL.md)**
+
+To adopt the toolkit, give your coding agent this instruction:
+
+> Install https://github.com/bjoernellens1/agent-rules in this repository, following INSTALL.md and AGENT_INSTALL.md. Use the appropriate profile, preserve existing rules, preview and verify the installation, and report the pinned revision.
+
 ## Quick start
 
 Requires Python 3.10+ and Git.
@@ -23,7 +31,7 @@ From the target project:
     python .agent-rules/agent.py scope --contract /path/to/frozen-scope.json
     python .agent-rules/agent.py learn --inbox .agent-work/knowledge.jsonl --finding "..." --evidence "commit/run/path" --scope optimizer
 
-The run CLI records real command execution, revision, exit status, elapsed time, context and artifact checksums. It is not a GPU scheduler or independent proof of scientific validity.
+The run CLI records real command execution, revision, exit status, elapsed time, context and artifact checksums. The runner itself is not an independent proof of scientific validity. Optional scheduler adapters provide bounded local and Kubernetes/Argo execution.
 
     python .agent-rules/agent.py run --out /tmp/screen-001 --context context.json --timeout 120 -- python benchmark.py
     python .agent-rules/agent.py status /tmp/screen-001
@@ -32,6 +40,27 @@ The run CLI records real command execution, revision, exit status, elapsed time,
     python .agent-rules/agent.py curve /tmp/base-001 /tmp/screen-001 --metric psnr --threshold 25
 
 Context must be identical across matched runs. Commands can write numeric metrics to the metrics.json file in the AGENT_RUN_DIR environment variable. Output directories must be outside the checkout or Git-ignored. Never include credentials or private data in commands, contexts, logs or shared receipts. Use a fresh output directory per run. See docs/execution.md.
+
+## Lifelong learning
+
+Every non-obvious validated finding must update the relevant repository and be recorded with evidence. Generalizable improvements must be proposed upstream in this toolkit. Permanent rules stay small; scoped facts, decisions, lessons, procedures and negative results go into a private shared SQLite knowledge store.
+
+    python .agent-rules/agent.py knowledge add --project sceneweave --topic depth/scale --body "REPLACE with verified finding" --evidence "REPLACE with actual evidence"
+    python .agent-rules/agent.py knowledge maintain --project sceneweave
+    python .agent-rules/agent.py knowledge proposals --project sceneweave
+    python .agent-rules/agent.py knowledge search --project sceneweave --include-global --query "depth scale" --budget 6000
+
+Observations are deduplicated, curated into proposals, reviewed, versioned and recalled selectively. Approved knowledge can be written back into Git-safe Markdown using a preview and explicit confirmation. See [knowledge and learning](docs/learning.md). Do not seed real memory with placeholder example claims.
+
+## Optional execution and agent evaluation
+
+    python .agent-rules/agent.py scheduler plan --spec scheduler.json
+    python .agent-rules/agent.py sandbox plan --spec sandbox.json
+    python .agent-rules/agent.py project list --config project.json
+    python .agent-rules/agent.py telemetry record --input attempt.json
+    python .agent-rules/agent.py benchmark compare --campaign trial --baseline baseline --candidate candidate
+
+Use the supplied templates and read [scheduler and isolation](docs/adapters.md), [agent benchmarks](docs/telemetry.md). Commands with external effects require explicit confirmation. No credentials, cluster or model providers are configured by installation.
 
 ## What's here
 
@@ -42,7 +71,7 @@ Context must be identical across matched runs. Commands can write numeric metric
 | skills/ | On-demand procedures, each with SKILL.md |
 | templates/ | Task, run context, gates, handoff and report starting points |
 | docs/ | Workflow, harness integration, execution, learning, sources |
-| tools/agent.py | Installer, doctor, task/worktree, scope, run, status, logs, verify, compare, curve, learn |
+| tools/agent*.py | Core CLI, lifelong knowledge, scheduler/evaluator/project adapters, telemetry and paired agent benchmarks |
 | tests/ | Dependency-free regression tests |
 | examples/ | Small executable end-to-end example |
 
@@ -58,7 +87,7 @@ See [workflow](docs/workflow.md), [learning](docs/learning.md), [execution](docs
 
 ## Scope
 
-Initial toolkit: local execution and safe installation, not an enterprise scheduler. Cluster integration, enforced evaluator isolation, provider telemetry and automatic memory curation are extension points; see [roadmap](docs/roadmap.md). Do not confuse textual instructions with OS or GitHub permissions.
+V2 includes local cooperative leases/cancellation, Kubernetes Job and Argo Workflow adapters, container isolation plans, knowledge curation and exchange, repository writeback, project manifests, and explicit telemetry/benchmark analysis. Real cluster, GPU, container-runtime and LLM-provider integration require site credentials, trusted immutable inputs and authorized smoke runs. Adapter planning/tests are not evidence of production deployment. See [roadmap](docs/roadmap.md).
 
 ## Development
 

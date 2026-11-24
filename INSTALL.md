@@ -55,3 +55,7 @@ No automatic destructive uninstall. Review .agent-rules/manifest.json and the ma
 ## Verification
 
 Run the toolkit tests, target doctor, install --check, knowledge audit and a read-only recall query. For optional scheduler, container and model adapters use the dry-run/plan interface first. Run a real smoke job only with approved infrastructure, resource limits and credentials. Document which checks were actually executed.
+
+## Optional adapters and lifelong learning
+
+Read docs/adapters.md before configuring a GPU scheduler or evaluator container, docs/telemetry.md before measuring agents, and docs/learning.md for review, scheduled curation, multi-host exchange and repository writeback. Install no scheduler or model credentials by default. Agents must update the authoritative repo docs/tests/tools when a durable validated finding is learned and propose reusable toolkit improvements upstream. Use the explicit review and privacy boundaries.

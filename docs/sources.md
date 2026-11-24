@@ -14,3 +14,11 @@ The rules and tools here are independently written syntheses, not copied agent p
 - [Anthropic, Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents): selective context and tool design.
 
 These references motivate practices, not proof of a specific productivity multiplier or the private DashSplat model lineup. Validate the toolkit's effects in our own work. Do not assume model or harness support based only on an example configuration.
+
+## Knowledge architecture
+
+- [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): incremental compaction and reusable linked knowledge.
+- [Letta archival memory](https://docs.letta.com/v1-sdk/memory/archival-memory): separate working context and long-term retrieval.
+- [Mem0 paper](https://arxiv.org/abs/2504.19413): extraction, updating and selective retrieval of memories.
+- [Graphiti](https://github.com/getzep/graphiti): temporal facts and provenance.
+- [SQLite FTS5](https://www.sqlite.org/fts5.html): local full-text indexing. The toolkit uses SQLite transactions, optional FTS5 and explicit review rather than adopting a vector or graph service up front. Semantic dedup is advisory and cannot establish truth.
