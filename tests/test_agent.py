@@ -134,11 +134,18 @@ class ToolkitTests(unittest.TestCase):
         out = self.run_fixture("detached", extra=("--detach",))
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
-            receipt = json.loads((out / "receipt.json").read_text())
+            try:
+                receipt = json.loads((out / "receipt.json").read_text())
+            except PermissionError:
+                time.sleep(0.05)
+                continue
             if receipt["status"] not in {"pending", "running"}:
                 break
             time.sleep(0.05)
         self.cli("verify", out, "--require-metrics")
+        if os.name == "nt":
+            # Terminal receipt precedes process exit by a short interval.
+            time.sleep(0.25)
 
     def test_learn_append(self):
         path = self.root / "inbox.jsonl"

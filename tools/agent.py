@@ -47,9 +47,16 @@ def file_hash(path):
 
 
 def read_json(path):
-    with path.open(encoding="utf-8") as stream:
-        return json.load(stream, parse_constant=lambda value: (_ for _ in ()).throw(
-            RuleError(f"Invalid JSON number: {value}")))
+    # Windows may transiently deny a read during an atomic replacement.
+    for attempt in range(21):
+        try:
+            with path.open(encoding="utf-8") as stream:
+                return json.load(stream, parse_constant=lambda value: (_ for _ in ()).throw(
+                    RuleError(f"Invalid JSON number: {value}")))
+        except PermissionError:
+            if os.name != "nt" or attempt == 20:
+                raise
+            time.sleep(0.05)
 
 
 def json_bytes(value):
@@ -64,7 +71,14 @@ def atomic_write(path, data):
         with os.fdopen(fd, "wb") as stream:
             stream.write(data)
         os.chmod(temp, mode)
-        os.replace(temp, path)
+        for attempt in range(21):
+            try:
+                os.replace(temp, path)
+                break
+            except PermissionError:
+                if os.name != "nt" or attempt == 20:
+                    raise
+                time.sleep(0.05)
     finally:
         if os.path.exists(temp):
             os.unlink(temp)
@@ -402,11 +416,14 @@ def execute(folder):
                     receipt["artifacts"][name] = file_hash(path)
                 except RuleError as exc:
                     receipt.update(status="error", error=str(exc))
-        write_json(folder / "receipt.json", receipt)
-        # Fail closed if the supervisor dies before cleanup; never remove another lease.
+        # Release before terminal publication; crash leaves a fail-closed lease.
         if lease_owned and (proc is None or proc.poll() is not None):
-            (lease / "owner.json").unlink(missing_ok=True)
-            lease.rmdir()
+            try:
+                (lease / "owner.json").unlink(missing_ok=True)
+                lease.rmdir()
+            except OSError as exc:
+                receipt.update(status="error", error="Lease cleanup failed: " + str(exc))
+        write_json(folder / "receipt.json", receipt)
     return 0 if receipt["status"] == "success" else 1
 
 
