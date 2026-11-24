@@ -1,0 +1,9 @@
+{
+  "dataset": "synthetic-smoke-v1",
+  "evaluator": "example benchmark (not scientific)",
+  "hardware": "local CPU",
+  "protocol": "synthetic example",
+  "seed": 0,
+  "budget": "30 seconds",
+  "warmup": "none"
+}

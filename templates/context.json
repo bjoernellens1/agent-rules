@@ -1,0 +1,9 @@
+{
+  "dataset": "REPLACE dataset/split/hash",
+  "evaluator": "REPLACE evaluator revision/hash",
+  "hardware": "REPLACE device/driver/backend",
+  "protocol": "REPLACE evaluation protocol",
+  "seed": 42,
+  "budget": "REPLACE compute budget",
+  "warmup": "REPLACE warmup/cache conditions"
+}

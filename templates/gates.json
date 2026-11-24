@@ -1,0 +1,10 @@
+{
+  "quality": {
+    "min": 0.8,
+    "min_delta": 0
+  },
+  "latency_ms": {
+    "max": 100,
+    "max_delta": 0
+  }
+}
