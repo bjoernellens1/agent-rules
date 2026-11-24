@@ -11,6 +11,7 @@ import platform
 import re
 import signal
 import stat
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -164,6 +165,8 @@ def install(args):
         ".agent-rules/research.md": (source / "rules/research.md").read_bytes(),
         ".agent-work/.gitignore": b"*\n!.gitignore\n",
     }
+    for module in sorted((source / "tools").glob("agent_*.py")):
+        files[".agent-rules/" + module.name] = module.read_bytes()
     for folder, dest in (("skills", ".agents/skills"), ("templates", ".agent-rules/templates")):
         for path in sorted((source / folder).rglob("*")):
             if path.is_file():
@@ -623,6 +626,8 @@ def parser():
     for key in ("inbox", "scope", "finding", "evidence"):
         s.add_argument("--" + key, required=True)
     s.set_defaults(func=learn)
+    import agent_kb
+    agent_kb.register(subs)
     s = subs.add_parser("_execute", help=argparse.SUPPRESS)
     s.add_argument("folder")
     s.set_defaults(func=lambda args: execute(Path(args.folder)))
@@ -633,7 +638,7 @@ def main():
     try:
         args = parser().parse_args()
         return args.func(args)
-    except (RuleError, OSError, ValueError, KeyError, TypeError, OverflowError) as exc:
+    except (RuleError, OSError, ValueError, KeyError, TypeError, OverflowError, sqlite3.Error) as exc:
         print(f"agent-rules: {exc}", file=sys.stderr)
         return 2
 
