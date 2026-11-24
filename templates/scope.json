@@ -1,0 +1,12 @@
+{
+  "base": "REPLACE immutable baseline commit SHA",
+  "allow": [
+    "src",
+    "tests/candidate"
+  ],
+  "protect": [
+    "src/evaluator.py",
+    "benchmarks",
+    "datasets/sealed"
+  ]
+}

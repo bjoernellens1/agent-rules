@@ -229,6 +229,57 @@ def task_new(args):
     return 0
 
 
+def task_worktree(args):
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}", args.id):
+        raise RuleError("Invalid task ID")
+    root = Path(identity(Path.cwd())["root"])
+    path = Path(args.path).resolve()
+    if path.exists() or path.is_relative_to(root) or not path.parent.is_dir():
+        raise RuleError("Worktree path must be fresh, outside this checkout, with an existing parent")
+    commit = git(root, "rev-parse", "--verify", "--end-of-options", args.base + "^{commit}").stdout.strip()
+    branch = "agent/" + args.id
+    git(root, "worktree", "add", "-b", branch, str(path), commit)
+    emit({"branch": branch, "worktree": identity(path),
+          "note": "Only committed base content is included; existing local edits were preserved."})
+    return 0
+
+
+def scope(args):
+    """Inspect committed, staged, unstaged and untracked paths against a contract."""
+    root = Path(identity(Path.cwd())["root"])
+    contract_path = Path(args.contract)
+    contract = read_json(contract_path)
+    if not isinstance(contract, dict):
+        raise RuleError("Scope contract must be an object")
+    if not isinstance(contract.get("base"), str) or not contract["base"]:
+        raise RuleError("Scope contract must specify a base revision")
+    allowed, protected = contract.get("allow"), contract.get("protect", [])
+    def valid_paths(paths):
+        return isinstance(paths, list) and all(
+            isinstance(p, str) and p and "\\" not in p and
+            all(part not in ("", ".", "..") for part in p.split("/"))
+            for p in paths)
+    if not valid_paths(allowed) or not allowed or not valid_paths(protected):
+        raise RuleError("Specify nonempty allow paths and optional protect paths as relative POSIX prefixes")
+    base = git(root, "rev-parse", "--verify", "--end-of-options",
+               contract["base"] + "^{commit}").stdout.strip()
+    if git(root, "merge-base", "--is-ancestor", base, "HEAD", check=False).returncode:
+        raise RuleError("Scope baseline must be an ancestor of HEAD")
+    changed = set()
+    for command in (("diff", "--name-only", "-z", "--no-renames", base, "HEAD", "--"),
+                    ("diff", "--cached", "--name-only", "-z", "--no-renames", base, "--"),
+                    ("diff", "--name-only", "-z", "--no-renames", "--"),
+                    ("ls-files", "--others", "--exclude-standard", "-z")):
+        changed.update(p for p in git(root, *command).stdout.split("\0") if p)
+    def matches(path, prefixes):
+        return any(path == p or path.startswith(p + "/") for p in prefixes)
+    denied = sorted(p for p in changed if matches(p, protected) or not matches(p, allowed))
+    emit({"status": "fail" if denied else "pass", "base": base,
+          "contract_sha256": file_hash(contract_path), "changed": sorted(changed),
+          "violations": denied, "note": "Diff check, not filesystem access control"})
+    return int(bool(denied))
+
+
 def metrics(path):
     if not path.is_file() or path.is_symlink():
         raise RuleError("Missing or unsafe metrics.json")
@@ -244,6 +295,8 @@ def metrics(path):
 def execute(folder):
     """Supervisor: execute only the explicit spec, never a shell implicitly."""
     spec = read_json(folder / "spec.json")
+    with (folder / "execution.lock").open("x") as lock:
+        lock.write(str(os.getpid()) + "\n")
     receipt = dict(spec)
     receipt.update(status="running", started_at=now(), supervisor_pid=os.getpid())
     write_json(folder / "receipt.json", receipt)
@@ -253,6 +306,10 @@ def execute(folder):
     result = "error"
     error = None
     try:
+        if file_hash(folder / "context.json") != spec["context_sha256"]:
+            raise RuleError("Context changed after submission")
+        if file_hash(HERE) != spec["runner_sha256"]:
+            raise RuleError("Runner changed after submission")
         before = identity(Path(spec["cwd"]))
         if before != spec["source_before"]:
             raise RuleError("Checkout changed after submission")
@@ -292,9 +349,9 @@ def execute(folder):
             after = None
         receipt.update(status=result, finished_at=now(), exit_code=code,
                        elapsed_s=round(time.monotonic()-start, 6), source_after=after,
-                       source_unchanged=(after == spec["source_before"]),
+                       source_unchanged=(not spec["source_before"]["dirty"] and after == spec["source_before"]),
                        error=error, artifacts={})
-        for name in ("spec.json", "context.json", "run.log", "metrics.json"):
+        for name in ("spec.json", "context.json", "run.log", "metrics.json", "curve.json"):
             path = folder / name
             if path.exists() or path.is_symlink():
                 try:
@@ -332,7 +389,7 @@ def run(args):
         folder.chmod(0o700)
     spec = {"schema": SCHEMA, "command": command, "cwd": str(cwd), "source_before": source,
             "timeout_s": args.timeout, "submitted_at": now(),
-            "context_sha256": digest(json_bytes(context))}
+            "context_sha256": digest(json_bytes(context)), "runner_sha256": file_hash(HERE)}
     write_json(folder / "context.json", context)
     write_json(folder / "spec.json", spec)
     write_json(folder / "receipt.json", dict(spec, status="pending"))
@@ -364,7 +421,7 @@ def verified(folder, require_metrics=False, matched=False):
     if not isinstance(artifacts, dict) or not required <= artifacts.keys():
         raise RuleError("Missing required receipt artifacts")
     for name, sha in artifacts.items():
-        if name not in {"spec.json", "context.json", "run.log", "metrics.json"}:
+        if name not in {"spec.json", "context.json", "run.log", "metrics.json", "curve.json"}:
             raise RuleError("Unknown receipt artifact")
         if file_hash(folder / name) != sha:
             raise RuleError(f"Artifact checksum mismatch: {name}")
@@ -415,6 +472,8 @@ def compare(args):
     ra, rb = verified(a, True, True), verified(b, True, True)
     if read_json(a / "context.json") != read_json(b / "context.json"):
         raise RuleError("Unmatched run contexts")
+    if not ra.get("runner_sha256") or ra["runner_sha256"] != rb.get("runner_sha256"):
+        raise RuleError("Unmatched runner revisions")
     ma, mb = metrics(a / "metrics.json"), metrics(b / "metrics.json")
     if ma.keys() != mb.keys():
         raise RuleError("Metric sets differ")
@@ -443,6 +502,47 @@ def compare(args):
           "status": ("pass" if passed else "fail") if outcomes else "compared_no_gates",
           "note": "Matching recorded contexts and numerical gates are not independent validation"})
     return 0 if passed else 1
+
+
+def curve(args):
+    """Compare first observed threshold crossings without interpolation."""
+    a, b = Path(args.baseline), Path(args.candidate)
+    if a.resolve() == b.resolve():
+        raise RuleError("Baseline and candidate must be different runs")
+    ra, rb = verified(a, False, True), verified(b, False, True)
+    if (read_json(a / "context.json") != read_json(b / "context.json") or
+        not ra.get("runner_sha256") or ra["runner_sha256"] != rb.get("runner_sha256")):
+        raise RuleError("Unmatched run contexts or runner revisions")
+    if not math.isfinite(args.threshold):
+        raise RuleError("Threshold must be finite")
+    def first(folder, receipt):
+        if "curve.json" not in receipt["artifacts"]:
+            raise RuleError("Missing recorded curve.json")
+        data = read_json(folder / "curve.json")
+        if not isinstance(data, dict) or not isinstance(data.get(args.metric), list) or not data[args.metric]:
+            raise RuleError(f"Missing curve metric: {args.metric}")
+        previous = -1.0
+        crossing = None
+        for point in data[args.metric]:
+            if not isinstance(point, dict) or set(point) != {"t_s", "value"}:
+                raise RuleError("Curve points require t_s and value")
+            t, value = point["t_s"], point["value"]
+            if any(not isinstance(x, (int, float)) or isinstance(x, bool) or
+                   not math.isfinite(x) for x in (t, value)) or t < 0 or t <= previous:
+                raise RuleError("Curve times must increase strictly; times and values must be finite")
+            previous = t
+            passes = value >= args.threshold if args.direction == "ge" else value <= args.threshold
+            if crossing is None and passes:
+                crossing = t
+        return {"first_observed_crossing_s": crossing, "last_sample_s": previous,
+                "reached": crossing is not None}
+    ba, ca = first(a, ra), first(b, rb)
+    bt, ct = ba["first_observed_crossing_s"], ca["first_observed_crossing_s"]
+    emit({"metric": args.metric, "threshold": args.threshold, "direction": args.direction,
+          "baseline": ba, "candidate": ca,
+          "speedup": bt / ct if bt is not None and ct is not None and ct > 0 else None,
+          "note": "Discrete first observed crossings; null means not reached or ratio undefined. Inspect curve stability."})
+    return 0
 
 
 def learn(args):
@@ -483,6 +583,14 @@ def parser():
     t.add_argument("id")
     t.add_argument("--objective", required=True)
     t.set_defaults(func=task_new)
+    t = tasks.add_parser("worktree")
+    t.add_argument("id")
+    t.add_argument("--path", required=True)
+    t.add_argument("--base", required=True)
+    t.set_defaults(func=task_worktree)
+    s = subs.add_parser("scope")
+    s.add_argument("--contract", required=True)
+    s.set_defaults(func=scope)
     s = subs.add_parser("run")
     s.add_argument("--out", required=True)
     s.add_argument("--context", required=True)
@@ -504,6 +612,13 @@ def parser():
     s.add_argument("candidate")
     s.add_argument("--gates")
     s.set_defaults(func=compare)
+    s = subs.add_parser("curve")
+    s.add_argument("baseline")
+    s.add_argument("candidate")
+    s.add_argument("--metric", required=True)
+    s.add_argument("--threshold", required=True, type=float)
+    s.add_argument("--direction", choices=["ge", "le"], default="ge")
+    s.set_defaults(func=curve)
     s = subs.add_parser("learn")
     for key in ("inbox", "scope", "finding", "evidence"):
         s.add_argument("--" + key, required=True)

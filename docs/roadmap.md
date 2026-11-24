@@ -1,6 +1,6 @@
 # Roadmap
 
-Implemented in the initial version: distributable core/research policies, on-demand skills, templates, non-destructive installer, local doctor/task creation, bounded synchronous/detached local command execution, receipt verification, matched metrics comparison/gates, and append-only findings.
+Implemented in the initial version: distributable core/research policies, on-demand skills, templates, non-destructive installer, local doctor/task creation and isolated worktrees, scope checks, bounded synchronous/detached local command execution, receipt verification, matched metrics comparison/gates and time-to-quality threshold comparisons, and append-only findings.
 
 Next, after real use on a small project:
 

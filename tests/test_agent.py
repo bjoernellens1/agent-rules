@@ -148,6 +148,41 @@ class ToolkitTests(unittest.TestCase):
         entries = [json.loads(line) for line in path.read_text().splitlines()]
         self.assertEqual([e["finding"] for e in entries], ["finding 0", "finding 1"])
 
+    def test_worktree_and_scope(self):
+        self.cli("task", "worktree", "worker", "--path", self.root / "worker", "--base", "HEAD")
+        self.assertTrue((self.root / "worker" / "README.md").is_file())
+        contract = self.root / "scope.json"
+        contract.write_text('{"base":"HEAD","allow":["src"],"protect":["src/evaluator.py"]}')
+        (self.project / "src").mkdir()
+        (self.project / "src/candidate.py").write_text("pass\n")
+        self.cli("scope", "--contract", contract)
+        (self.project / "src/evaluator.py").write_text("pass\n")
+        output = json.loads(self.cli("scope", "--contract", contract, ok=1).stdout)
+        self.assertEqual(output["violations"], ["src/evaluator.py"])
+
+    def test_curve_crossing_and_tamper(self):
+        for name, samples in (("a", [{"t_s":0,"value":0},{"t_s":4,"value":2}]),
+                              ("b", [{"t_s":0,"value":0},{"t_s":2,"value":2}]),
+                              ("c", [{"t_s":0,"value":0},{"t_s":2,"value":1}])):
+            payload = json.dumps({"score": samples})
+            self.cli("run", "--out", self.root / name, "--context", self.context, "--timeout", "5",
+                     "--", sys.executable, "-c",
+                     "import os;from pathlib import Path;Path(os.environ['AGENT_RUN_DIR'],'curve.json').write_text(" + repr(payload) + ")")
+        opts = ("--metric", "score", "--threshold", "2")
+        result = json.loads(self.cli("curve", self.root / "a", self.root / "b", *opts).stdout)
+        self.assertEqual(result["speedup"], 2)
+        result = json.loads(self.cli("curve", self.root / "a", self.root / "c", *opts).stdout)
+        self.assertIsNone(result["speedup"])
+        self.assertFalse(result["candidate"]["reached"])
+        (self.root / "b/curve.json").write_text("{}")
+        self.cli("curve", self.root / "a", self.root / "b", *opts, ok=2)
+
+    def test_supervisor_cannot_overwrite_receipt(self):
+        out = self.run_fixture("a")
+        original = (out / "receipt.json").read_bytes()
+        self.cli("_execute", out, ok=2)
+        self.assertEqual((out / "receipt.json").read_bytes(), original)
+
     def test_nonfinite_and_boolean_metrics(self):
         for name, payload in (("nan", '{"score":NaN}'), ("bool", '{"score":true}')):
             out = self.root / name

@@ -22,3 +22,7 @@ Record elapsed time to validated outcome, LLM input/output/cache tokens when the
 ## Isolation and acceptance
 
 A Markdown rule is guidance, not access control. For consequential runs use distinct candidate and evaluator checkouts, read-only evaluator/data mounts, least-privilege credentials, and a separately controlled acceptance configuration. Freeze evaluator and dataset hashes in run context. Candidate agents may propose revisions, not apply them. The coordinator can accept a negative result as a completed research task without accepting its implementation as an improvement.
+
+## Executable ownership checks
+
+Use task worktree with an explicit base and fresh path outside the current checkout. Use the scope command with a reviewer-controlled copy of templates/scope.json, replacing the base with an immutable commit SHA and allowed/protected paths with actual repository-relative prefixes. The scope tool inspects committed, staged, unstaged and nonignored untracked paths, including both sides of renames. Protected paths override allowed paths. This detects out-of-scope changes at review time, not transient writes or ignored files; enforce real evaluator isolation separately.

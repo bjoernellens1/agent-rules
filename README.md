@@ -19,6 +19,8 @@ From the target project:
 
     python .agent-rules/agent.py doctor
     python .agent-rules/agent.py task new optimizer-screen --objective "Reduce time to quality"
+    python .agent-rules/agent.py task worktree optimizer-screen --path /path/to/isolated-checkout --base HEAD
+    python .agent-rules/agent.py scope --contract /path/to/frozen-scope.json
     python .agent-rules/agent.py learn --inbox .agent-work/knowledge.jsonl --finding "..." --evidence "commit/run/path" --scope optimizer
 
 The run CLI records real command execution, revision, exit status, elapsed time, context and artifact checksums. It is not a GPU scheduler or independent proof of scientific validity.
@@ -27,6 +29,7 @@ The run CLI records real command execution, revision, exit status, elapsed time,
     python .agent-rules/agent.py status /tmp/screen-001
     python .agent-rules/agent.py verify /tmp/screen-001 --require-metrics
     python .agent-rules/agent.py compare /tmp/base-001 /tmp/screen-001 --gates gates.json
+    python .agent-rules/agent.py curve /tmp/base-001 /tmp/screen-001 --metric psnr --threshold 25
 
 Context must be identical across matched runs. Commands can write numeric metrics to the metrics.json file in the AGENT_RUN_DIR environment variable. Output directories must be outside the checkout or Git-ignored. Never include credentials or private data in commands, contexts, logs or shared receipts. Use a fresh output directory per run. See docs/execution.md.
 
@@ -39,7 +42,7 @@ Context must be identical across matched runs. Commands can write numeric metric
 | skills/ | On-demand procedures, each with SKILL.md |
 | templates/ | Task, run context, gates, handoff and report starting points |
 | docs/ | Workflow, harness integration, execution, learning, sources |
-| tools/agent.py | Installer, doctor, task, run, status, logs, verify, compare, learn |
+| tools/agent.py | Installer, doctor, task/worktree, scope, run, status, logs, verify, compare, curve, learn |
 | tests/ | Dependency-free regression tests |
 | examples/ | Small executable end-to-end example |
 
