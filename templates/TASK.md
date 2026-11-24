@@ -12,3 +12,4 @@ Stop conditions:
 Evidence required:
 Decision: pending / accept / reject / revise / blocked
 Handoff (commit, artifacts, next action):
+Learning disposition (repo update + KB evidence + upstream rule/tool proposal, or no durable finding / blocker):

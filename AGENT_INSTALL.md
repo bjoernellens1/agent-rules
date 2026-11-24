@@ -12,3 +12,5 @@ Use this document when a human asks you to adopt agent-rules in an existing repo
 - Report target path, toolkit revision, profile, changed files, conflicts, verification results, and remaining harness-specific configuration. Do not claim a check you did not run.
 
 After installation use AGENTS.md as the root policy. Load only relevant skills. Keep personal and site-specific information in the private knowledge store or external configuration, not in distributable rules.
+
+After adoption, enforce the learning writeback rule: verified discoveries must update the target project's authoritative docs/tests/tools, and reusable improvements should be proposed upstream in agent-rules. Preserve privacy and protected review boundaries; never silently edit vendored managed blocks.

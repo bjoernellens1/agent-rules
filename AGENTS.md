@@ -7,3 +7,5 @@ Maintain a small harness-independent toolkit. The canonical distributable instru
 - Run python -m unittest discover -s tests -v after relevant changes; add focused tests for changed behavior.
 - Keep claims in README consistent with actual implementation. Clearly label unimplemented adapters and limitations.
 - Do not add credentials or private machine details. Prefer explicit permission, immutable evidence and bounded outputs.
+
+- This toolkit must improve itself: validated reusable findings from adopter repos belong in the canonical rules, skills, tools or regression tests here, not only in a conversation. Include evidence and a focused diff; do not loosen policy without designated approval.
