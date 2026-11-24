@@ -15,6 +15,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import shutil
 import time
 
 HERE = Path(__file__).resolve()
@@ -295,6 +296,28 @@ def metrics(path):
     return data
 
 
+def lease_path(name):
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,100}", name):
+        raise RuleError("Lease name must be a stable machine/device key")
+    root = Path(os.environ.get("AGENT_RULES_HOME", Path.home() / ".local/share/agent-rules")).expanduser() / "leases"
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return root / name
+
+def cancel(args):
+    folder = Path(args.run).resolve()
+    receipt = read_json(folder / "receipt.json")
+    if receipt["status"] not in ("pending", "running"):
+        raise RuleError("Run is already terminal")
+    marker = folder / "cancel.request"
+    try:
+        with marker.open("x", encoding="utf-8") as stream:
+            stream.write(now() + "\n")
+    except FileExistsError:
+        pass
+    emit({"status": "cancellation_requested", "run": str(folder),
+          "note": "Supervisor must observe request; inspect status for actual outcome"})
+    return 0
+
 def execute(folder):
     """Supervisor: execute only the explicit spec, never a shell implicitly."""
     spec = read_json(folder / "spec.json")
@@ -308,7 +331,20 @@ def execute(folder):
     code = None
     result = "error"
     error = None
+    lease = None
+    lease_owned = False
     try:
+        if spec.get("lease"):
+            lease = lease_path(spec["lease"])
+            try:
+                lease.mkdir(mode=0o700)
+                lease_owned = True
+            except FileExistsError:
+                raise RuleError("Device lease occupied; inspect existing owner: " + str(lease))
+            write_json(lease / "owner.json", {"run": str(folder), "supervisor_pid": os.getpid(), "acquired": now()})
+        if (folder / "cancel.request").exists():
+            result = "cancelled"
+            return 1
         if file_hash(folder / "context.json") != spec["context_sha256"]:
             raise RuleError("Context changed after submission")
         if file_hash(HERE) != spec["runner_sha256"]:
@@ -321,19 +357,24 @@ def execute(folder):
             proc = subprocess.Popen(spec["command"], cwd=spec["cwd"], env=env,
                                     stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                                     start_new_session=(os.name == "posix"))
-            try:
-                code = proc.wait(timeout=spec["timeout_s"])
-                result = "success" if code == 0 else "failed"
-            except subprocess.TimeoutExpired:
-                result = "timeout"
-                if os.name == "posix":
-                    try:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                else:
-                    proc.kill()
-                code = proc.wait()
+            deadline = time.monotonic() + spec["timeout_s"]
+            while True:
+                code = proc.poll()
+                if code is not None:
+                    result = "success" if code == 0 else "failed"
+                    break
+                if (folder / "cancel.request").exists() or time.monotonic() >= deadline:
+                    result = "cancelled" if (folder / "cancel.request").exists() else "timeout"
+                    if os.name == "posix":
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    else:
+                        proc.kill()
+                    code = proc.wait()
+                    break
+                time.sleep(0.05)
     except (OSError, RuleError, KeyboardInterrupt) as exc:
         error = str(exc)
         if proc is not None and proc.poll() is None:
@@ -362,6 +403,10 @@ def execute(folder):
                 except RuleError as exc:
                     receipt.update(status="error", error=str(exc))
         write_json(folder / "receipt.json", receipt)
+        # Fail closed if the supervisor dies before cleanup; never remove another lease.
+        if lease_owned and (proc is None or proc.poll() is not None):
+            (lease / "owner.json").unlink(missing_ok=True)
+            lease.rmdir()
     return 0 if receipt["status"] == "success" else 1
 
 
@@ -377,6 +422,8 @@ def run(args):
     source = identity(cwd)
     if source["dirty"] and not args.allow_dirty:
         raise RuleError("Dirty checkout; commit intended inputs or use --allow-dirty for exploration")
+    if args.lease:
+        lease_path(args.lease)
     context = read_json(Path(args.context))
     if not isinstance(context, dict) or not context:
         raise RuleError("Context must be a nonempty JSON object")
@@ -392,7 +439,7 @@ def run(args):
         folder.chmod(0o700)
     spec = {"schema": SCHEMA, "command": command, "cwd": str(cwd), "source_before": source,
             "timeout_s": args.timeout, "submitted_at": now(),
-            "context_sha256": digest(json_bytes(context)), "runner_sha256": file_hash(HERE)}
+            "context_sha256": digest(json_bytes(context)), "runner_sha256": file_hash(HERE), "lease": args.lease}
     write_json(folder / "context.json", context)
     write_json(folder / "spec.json", spec)
     write_json(folder / "receipt.json", dict(spec, status="pending"))
@@ -600,8 +647,12 @@ def parser():
     s.add_argument("--timeout", type=float, required=True)
     s.add_argument("--allow-dirty", action="store_true")
     s.add_argument("--detach", action="store_true")
+    s.add_argument("--lease", help="Exclusive cooperative machine/device lease")
     s.add_argument("command", nargs=argparse.REMAINDER)
     s.set_defaults(func=run)
+    s = subs.add_parser("cancel")
+    s.add_argument("run")
+    s.set_defaults(func=cancel)
     for name, func in (("status", status), ("logs", logs), ("verify", verify)):
         s = subs.add_parser(name)
         s.add_argument("run")
@@ -628,6 +679,8 @@ def parser():
     s.set_defaults(func=learn)
     import agent_kb
     agent_kb.register(subs)
+    import agent_ops
+    agent_ops.register(subs)
     s = subs.add_parser("_execute", help=argparse.SUPPRESS)
     s.add_argument("folder")
     s.set_defaults(func=lambda args: execute(Path(args.folder)))
@@ -638,7 +691,7 @@ def main():
     try:
         args = parser().parse_args()
         return args.func(args)
-    except (RuleError, OSError, ValueError, KeyError, TypeError, OverflowError, sqlite3.Error) as exc:
+    except (RuleError, OSError, ValueError, KeyError, TypeError, OverflowError, sqlite3.Error, subprocess.TimeoutExpired) as exc:
         print(f"agent-rules: {exc}", file=sys.stderr)
         return 2
 
