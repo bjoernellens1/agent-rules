@@ -14,3 +14,5 @@ Use this document when a human asks you to adopt agent-rules in an existing repo
 After installation use AGENTS.md as the root policy. Load only relevant skills. Keep personal and site-specific information in the private knowledge store or external configuration, not in distributable rules.
 
 After adoption, enforce the learning writeback rule: verified discoveries must update the target project's authoritative docs/tests/tools, and reusable improvements should be proposed upstream in agent-rules. Preserve privacy and protected review boundaries; never silently edit vendored managed blocks.
+
+Adopt skill-forge: record recurring validated workflows and automatically create or extend a skill when the evidence threshold is reached. Check the installed and canonical skill libraries first; put reusable skills upstream in agent-rules and project-specific skills in the owning repository. Verify the procedure and commit the authorized change, or report an actionable blocker.

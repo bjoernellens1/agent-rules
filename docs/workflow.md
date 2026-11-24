@@ -30,3 +30,5 @@ Use task worktree with an explicit base and fresh path outside the current check
 ## Completion includes repository learning
 
 Before final handoff, run the learn skill: recall relevant prior knowledge, record any durable verified finding in the target repository's authoritative file and the shared knowledge store, and prepare an evidence-backed upstream improvement for general rules, skills, checks or tools. Mark no durable finding or a precise blocker explicitly. A local chat summary alone is not completion. Do not expose private data or weaken protected policies. Prefer a test/tool improvement to repeatedly adding prose.
+
+Recurring validated work must become a reusable skill at three distinct task uses when appropriate. Record uses in the private KB; inventory existing skills; load skill-forge, test the procedure and commit the appropriate canonical skill. If it is deterministic, implement a tool or test and let the skill call it. See docs/skills.md.

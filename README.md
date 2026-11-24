@@ -52,6 +52,15 @@ Every non-obvious validated finding must update the relevant repository and be r
 
 Observations are deduplicated, curated into proposals, reviewed, versioned and recalled selectively. Approved knowledge can be written back into Git-safe Markdown using a preview and explicit confirmation. See [knowledge and learning](docs/learning.md). Do not seed real memory with placeholder example claims.
 
+## Automatic skill creation
+
+When a validated procedure is used in three independent tasks, agents must create or improve a reusable skill, validate the procedure and commit the change in its owning repository. Generalizable skills go upstream here; project-specific ones stay local. The private knowledge database tracks distinct task evidence.
+
+    python .agent-rules/agent.py skill candidates
+    python .agent-rules/agent.py skill inventory --target /path/to/repo
+
+See [skill lifecycle and commands](docs/skills.md) and [skill-forge](skills/skill-forge/SKILL.md).
+
 ## Optional execution and agent evaluation
 
     python .agent-rules/agent.py scheduler plan --spec scheduler.json
@@ -71,7 +80,7 @@ Use the supplied templates and read [scheduler and isolation](docs/adapters.md),
 | skills/ | On-demand procedures, each with SKILL.md |
 | templates/ | Task, run context, gates, handoff and report starting points |
 | docs/ | Workflow, harness integration, execution, learning, sources |
-| tools/agent*.py | Core CLI, lifelong knowledge, scheduler/evaluator/project adapters, telemetry and paired agent benchmarks |
+| tools/agent*.py | Core CLI, lifelong knowledge, scheduler/evaluator/project adapters, telemetry, paired agent benchmarks and recurring-workflow skill creation |
 | tests/ | Dependency-free regression tests |
 | examples/ | Small executable end-to-end example |
 

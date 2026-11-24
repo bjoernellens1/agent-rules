@@ -1,0 +1,25 @@
+{
+  "workflow": "REPLACE/stable-workflow",
+  "name": "replace-skill-name",
+  "scope": "shared",
+  "description": "Use when REPLACE precise repeated task trigger.",
+  "prerequisites": [
+    "REPLACE required tools and inputs"
+  ],
+  "steps": [
+    "REPLACE first validated step",
+    "REPLACE second validated step"
+  ],
+  "verification": [
+    "REPLACE actual checks and expected outcomes"
+  ],
+  "failure_handling": [
+    "REPLACE stop conditions and diagnostic action"
+  ],
+  "when_not_to_use": [
+    "REPLACE scope limitations"
+  ],
+  "public_evidence": [
+    "REPLACE repository-safe commit or report reference"
+  ]
+}

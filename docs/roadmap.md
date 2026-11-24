@@ -2,13 +2,15 @@
 
 ## Implemented V2
 
-- Core/research rules, eight reusable skills, task/report/handoff/scope templates, non-destructive installer and explicit human/agent installation contracts.
+- Core/research rules, nine reusable skills, task/report/handoff/scope templates, non-destructive installer and explicit human/agent installation contracts.
 - Local run receipts, isolated worktrees, scope checks, numerical gates and time-to-quality curves.
 - Cooperative local device leases/cancellation; Kubernetes Job and Argo Workflow manifest/submit/status/log/usage/cancel adapters, mounted artifact fetch, canonical project argv.
 - Candidate/evaluator container planning/execution with disjoint read-only inputs and separate output.
 - Private explicit task telemetry and matched agent benchmark comparisons.
 - Shared SQLite knowledge: observation deduplication, evidence, active temporal facts, approval/rejection, stale review, lexical search and duplicate candidates, optional curator command, Markdown export, backup, cross-host observation exchange and reviewed Git writeback.
 - Mandatory learning writeback: target repo canonical source + private KB + evidence-backed upstream improvement where generalizable.
+
+- Evidence-triggered skill creation: distinct-task usage, candidate discovery, inventory, bounded skill generation and committed promotion records. Agents must use this in completion workflows; it is not a passive session monitor.
 
 ## Site integration and evidence still needed
 

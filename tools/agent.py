@@ -700,6 +700,8 @@ def parser():
     agent_ops.register(subs)
     import agent_telemetry
     agent_telemetry.register(subs)
+    import agent_skills
+    agent_skills.register(subs)
     s = subs.add_parser("_execute", help=argparse.SUPPRESS)
     s.add_argument("folder")
     s.set_defaults(func=lambda args: execute(Path(args.folder)))
